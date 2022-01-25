@@ -1,49 +1,59 @@
-import React from 'react';
-import { NavLink } from "react-router-dom"
+import { useWeb3React } from "@web3-react/core";
+import { InjectedConnector } from "@web3-react/injected-connector";
+import React, { useCallback, useState } from "react";
+import { ThirdwebSDK } from "@3rdweb/sdk";
 
-const AuthNFT = ({
-    name,
-    imgsrc,
-    isCompName,
-    compName,
-    visit,
-    btnname
-}) => {
-    return (
-        <>
-            <section id="header" className="d-flex align-items-center">
-            <div className="container-fluid">
-                <div className="row">
-                    <div className="col-10 mx-auto">
-                        <div className="row">
-                            <div className="col-md-6 pt-5 pt-lg-0 order-2 order-lg-1 d-flex justify-content-center flex-column">
-                                <h1> 
-                                     {name}
-                                     {isCompName ? <strong className="brand-name"> {compName}</strong> : ""}
-                                    
-                                </h1>
-                                <h2 className="my-3">
-                                    We are the team of talented developer making metaverse accesible to everyone
-                                </h2>
+const injectedConnector = new InjectedConnector({ supportedChainIds: [4] });
 
-                                <div className="mt-3">
-                                    <NavLink to={visit} className="btn-get-started ">
-                                        {btnname}
-                                    </NavLink>
-                                </div>
-                            </div>
+const MEMBERSHIP_NFT_CONTRACT_ADDRESS =
+  "0x0e8101d3C825daF651017eeC29EB02B0217b4f33";
+const MEMBERSHIP_NFT_TOKEN_ID = "0";
+const MEMBERSHIP_NFT_TOKEN_COUNT = 1;
+const OPENSEA_LINK =
+  "https://testnets.opensea.io/assets/0x0e8101d3c825daf651017eec29eb02b0217b4f33/0";
 
-                            <div className="col-lg-6 order-1 order-lg-2 header-image">
-                                <img src={imgsrc} className="img-fluid animated" alt="Home Img"/>
-                            </div>
+/**
+ * A React hook that can be used to determine membership status of the connected wallet
+ * @returns true, if connected wallet owns the NFT.
+ */
+const useWalletMembershipAccess = () => {
+    const [access, setAccess] = useState(false);
+    const { account, library } = useWeb3React();
 
-                        </div>
-                    </div>
-                </div>
-            </div>
-            </section>
-        </>
-    )
-}
+    async function checkWalletMembership() {
+        // get the connected wallet as a signer
+        const signer = library.getSigner(account);
 
-export default AuthNFT;
+        /*
+          SDK takes in a valid Signer or Provider.
+          A signer can perform READ and WRITE calls on the blockchain.
+          A provider can only perform READ calls on the blockchain.
+          Read more: https://docs.ethers.io/v5/api/signer
+          */
+        const module = new ThirdwebSDK(signer).getCollectionModule(
+            MEMBERSHIP_NFT_CONTRACT_ADDRESS
+        );
+
+        // check connceted wallet balance of the token
+        const balance = await module.balance(MEMBERSHIP_NFT_TOKEN_ID);
+        if (balance.toNumber() >= MEMBERSHIP_NFT_TOKEN_COUNT) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    if (library && account) {
+        // Check wallet for membership nft then update the state.
+        checkWalletMembership().then(setAccess);
+    } else {
+        // Reset access state if account is disconnected.
+        if (access) {
+            setAccess(false);
+        }
+    }
+
+    return access;
+};
+
+export default useWalletMembershipAccess;
